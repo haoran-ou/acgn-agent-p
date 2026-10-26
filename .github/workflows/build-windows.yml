@@ -1,0 +1,40 @@
+# 打包 Windows 版（C-02）：在 GitHub 的 Windows 构建机上运行 PyInstaller，产出 如月寮.exe。
+# 这是“只提交使用者需要的文件”的例外（你同意的）：没有它就做不出 Windows 版。
+# 触发：在 GitHub 仓库的 Actions 页面手动点 “Run workflow”，或者推送 v 开头的 tag（例如 v0.1.0）。
+name: build-windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: 安装依赖（含桌面窗口和打包工具）
+        run: uv sync --locked
+
+      - name: 打包
+        working-directory: packaging
+        run: uv run pyinstaller kisaragi.spec --noconfirm --distpath ../dist --workpath ../build
+
+      - name: 检查能启动（不开窗口，只检查导入）
+        run: uv run python -c "import acg_agent.desktop, acg_agent.api.app; print('ok')"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kisaragi-windows
+          path: dist/如月寮.exe
+          if-no-files-found: error
+          retention-days: 30

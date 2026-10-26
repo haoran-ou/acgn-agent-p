@@ -1,0 +1,54 @@
+[project]
+name = "acg-agent"
+version = "0.1.0"
+description = "面向复杂偏好的 ACG 发现系统，提供可追溯的匹配依据"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "haoran-ou", email = "76810796+haoran-ou@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "certifi>=2026.10.23",
+    "fastapi==0.162.*",
+    "networkx==3.*",
+    "opencc-python-reimplemented==0.1.*",
+    "pydantic==2.*",
+    "pydantic-ai-slim[google,openai]==2.61.*",
+    "pyyaml==6.*",
+    "uvicorn==0.54.*",
+    "zstandard==0.25.*",
+]
+
+[project.scripts]
+acg-import = "acg_agent.importer.cli:main"
+acg-import-platforms = "acg_agent.importer.cli:main_platforms"
+acg-import-vndb = "acg_agent.importer.cli:main_vndb"
+acg-serve = "acg_agent.api.app:main"
+acg-setup = "acg_agent.datasync.cli:main_setup"
+acg-update = "acg_agent.datasync.cli:main_update"
+
+[project.gui-scripts]
+acg-desktop = "acg_agent.desktop:main"  # 桌面客户端（需要 desktop 这组可选依赖）
+
+[project.optional-dependencies]
+desktop = [
+    "platformdirs==4.*",
+    "pywebview==6.2.*",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "acg-agent[desktop]",  # 开发时也装上桌面客户端的依赖，测试才跑得了
+    "httpx2==2.16.*",
+    "pyinstaller==6.*",
+    "pytest==8.*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
