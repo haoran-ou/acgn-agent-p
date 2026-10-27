@@ -752,8 +752,21 @@ async function loadSettings() {
     state.settings = null;
   }
   applyAppearance(state.settings?.appearance);
+  renderModelStatus();
   $("tab-galgame").hidden = !state.settings?.adult_enabled;
   if (state.tab === "galgame" && !state.settings?.adult_enabled) setTab("anime");
+}
+
+function renderModelStatus() {
+  // 主页面和设置页顶部都写明现在用的是什么：哪家 · 哪个型号，或者只用规则
+  const s = state.settings;
+  if (!s) return;
+  const name = providerOf(s.provider).name || s.provider;
+  let parts;
+  if (s.using_ai) parts = ["正在使用：", el("b", { text: `${name} · ${s.model}` })];
+  else if (s.provider === "none") parts = ["正在使用：", el("b", { text: "规则解析（没有 AI）" }), "：免费、最快，理解不了复杂的说法，代理人不可用"];
+  else parts = ["正在使用：", el("b", { text: "规则解析（没有 AI）" }), `：${name} 还没有填 Key`];
+  for (const id of ["model-status", "settings-model-status"]) $(id).replaceChildren(...parts.map((x) => (typeof x === "string" ? document.createTextNode(x) : x.cloneNode(true))));
 }
 
 function providerOf(id) {
@@ -768,17 +781,36 @@ function renderProvider() {
   const note = $("provider-note");
   note.replaceChildren(el("span", { text: p.note || "" }));
   if (p.key_url) note.append(el("span", { text: " · " }), safeLink(p.key_url, "去申请 Key"));
-  $("model-options").replaceChildren(...(p.models || []).map((m) => el("option", { value: m })));
-  $("set-model").value = id === s.provider ? s.model : (p.models || [""])[0] || "";
+  $("provider-fields").hidden = id === "none";  // 不用 AI：没有型号、Key 可填
+  renderModels(p);
   $("base-url-row").hidden = id !== "custom";
   $("set-base-url").value = s.base_url || "";
   $("key-label").textContent = `${p.name || ""} 的 API Key`;
   $("set-key").value = "";
   $("set-clear-key").checked = false;
-  $("set-clear-key").disabled = p.key_source !== "settings";
+  $("set-clear-key").disabled = !p.has_key;
   $("key-status").textContent = p.has_key
-    ? `已有 ${p.key_source === "settings" ? "设置页保存的" : ".env 里的"} Key（${p.key_hint}）`
-    : "还没有 Key：AI 解析和代理人不可用，只能用规则解析。";
+    ? `已有这一家的 Key（${p.key_hint}）`
+    : "还没有这一家的 Key：填了才会用 AI；不填就只用规则解析。";
+}
+
+const CUSTOM_MODEL = "__custom__";
+
+function renderModels(p) {
+  // 型号用下拉菜单：候选型号（第一个是默认的）+ 之前手填过的 + “自己填写…”。
+  // 不用 <input list>：框里有字时浏览器只显示匹配的候选，手填过别的型号后就切不回默认的了
+  const models = p.models || [];
+  const options = models.map((m, i) => el("option", { value: m, text: i === 0 ? `${m}（默认）` : m }));
+  if (p.model && !models.includes(p.model)) options.push(el("option", { value: p.model, text: `${p.model}（你填的）` }));
+  options.push(el("option", { value: CUSTOM_MODEL, text: "自己填写…" }));
+  $("set-model").replaceChildren(...options);
+  $("set-model").value = p.model || CUSTOM_MODEL;
+  $("set-model-custom").value = "";
+  $("model-custom-row").hidden = $("set-model").value !== CUSTOM_MODEL;
+}
+
+function chosenModel() {
+  return $("set-model").value === CUSTOM_MODEL ? $("set-model-custom").value.trim() : $("set-model").value;
 }
 
 function renderFreeKeys() {
@@ -805,6 +837,8 @@ function openSettings() {
   $("set-covers").checked = !!s.show_all_covers;
   $("set-covers").disabled = !s.adult_enabled;
   $("settings-error").hidden = true;
+  $("unsaved-box").hidden = true;
+  renderModelStatus();
   $("settings-dialog").showModal();
 }
 
@@ -816,7 +850,7 @@ function settingsBody() {
   const key = $("set-key").value.trim();
   if (key) body.api_key = key;
   else if ($("set-clear-key").checked) body.api_key = "";
-  const model = $("set-model").value.trim();
+  const model = chosenModel();
   if (model && (model !== s.model || body.provider)) body.model = model;
   if (provider === "custom" && $("set-base-url").value.trim() !== (s.base_url || "")) body.base_url = $("set-base-url").value.trim();
   return body;
@@ -831,6 +865,7 @@ async function testConnection() {
     const body = settingsBody();
     if (Object.keys(body).length) state.settings = await request("/settings", body);
     renderProvider();
+    renderModelStatus();
     const r = await request("/settings/test", {});
     box.textContent = r.ok ? `✓ ${r.detail}` : `✗ ${r.detail}`;
   } catch (err) {
@@ -838,8 +873,8 @@ async function testConnection() {
   }
 }
 
-async function saveSettings(event) {
-  event.preventDefault();
+function pendingChanges() {
+  // 设置页里改了、还没保存的东西（背景图是选了就上传的，不算在这里）
   const s = state.settings || {};
   const body = settingsBody();
   if ($("set-agent").checked !== s.agent_enabled) body.agent_enabled = $("set-agent").checked;
@@ -853,17 +888,35 @@ async function saveSettings(event) {
   const changed = Object.fromEntries(Object.entries(draft).filter(([k, v]) =>
     !["background", "background_version"].includes(k) && v !== s.appearance?.[k]));
   if (Object.keys(changed).length) body.appearance = changed;
+  return body;
+}
+
+async function saveSettings(event) {
+  event?.preventDefault();
+  const body = pendingChanges();
   try {
     if (Object.keys(body).length) state.settings = await request("/settings", body);
     $("tab-galgame").hidden = !state.settings.adult_enabled;
     if (state.tab === "galgame" && !state.settings.adult_enabled) setTab("anime");
+    renderModelStatus();
     $("settings-dialog").close();
     loadDataStatus();
   } catch (err) {
+    $("unsaved-box").hidden = true;
     const box = $("settings-error");
     box.textContent = err.message;
     box.hidden = false;
   }
+}
+
+function requestCloseSettings() {
+  // 右上角的 × 和 Esc：有没保存的更改时先问一句（返回修改 / 不保存，关闭 / 保存并关闭）
+  if (!Object.keys(pendingChanges()).length) {
+    $("settings-dialog").close();
+    return;
+  }
+  $("unsaved-box").hidden = false;
+  $("unsaved-save").focus();
 }
 
 function onAdultToggle() {
@@ -915,9 +968,21 @@ for (const [name, color] of Object.entries(ACCENTS)) {
 $("set-bg").addEventListener("change", uploadBackground);
 $("remove-bg").addEventListener("click", removeBackground);
 $("settings-form").addEventListener("submit", saveSettings);
+$("settings-close").addEventListener("click", requestCloseSettings);
+$("settings-dialog").addEventListener("cancel", (event) => {  // 按 Esc：和点 × 一样，先检查有没有没保存的
+  event.preventDefault();
+  requestCloseSettings();
+});
+$("unsaved-back").addEventListener("click", () => { $("unsaved-box").hidden = true; });
+$("unsaved-discard").addEventListener("click", () => $("settings-dialog").close());
+$("unsaved-save").addEventListener("click", () => saveSettings());
 $("set-adult").addEventListener("change", onAdultToggle);
 $("update-now").addEventListener("click", updateNow);
 $("set-provider").addEventListener("change", renderProvider);
+$("set-model").addEventListener("change", () => {
+  $("model-custom-row").hidden = $("set-model").value !== CUSTOM_MODEL;
+  if (!$("model-custom-row").hidden) $("set-model-custom").focus();
+});
 $("test-connection").addEventListener("click", testConnection);
 $("setup-start").addEventListener("click", updateNow);
 

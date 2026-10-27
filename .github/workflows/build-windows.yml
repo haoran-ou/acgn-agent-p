@@ -1,4 +1,4 @@
-# 打包 Windows 版（C-02）：在 GitHub 的 Windows 构建机上运行 PyInstaller，产出 如月寮.exe。
+# 打包 Windows 版（C-02）：在 GitHub 的 Windows 构建机上运行 PyInstaller，产出 如月寮.exe，改名为 Kisaragi-Windows.exe 再上传（GitHub Release 会去掉附件名里的中文）。
 # 这是“只提交使用者需要的文件”的例外（你同意的）：没有它就做不出 Windows 版。
 # 触发：在 GitHub 仓库的 Actions 页面手动点 “Run workflow”，或者推送 v 开头的 tag（例如 v0.1.0）。
 name: build-windows
@@ -32,9 +32,12 @@ jobs:
       - name: 检查能启动（不开窗口，只检查导入）
         run: uv run python -c "import acg_agent.desktop, acg_agent.api.app; print('ok')"
 
+      - name: 改成英文文件名（程序里显示的名字仍是“如月寮”）
+        run: Get-ChildItem dist -Filter *.exe | Rename-Item -NewName Kisaragi-Windows.exe
+
       - uses: actions/upload-artifact@v4
         with:
           name: kisaragi-windows
-          path: dist/如月寮.exe
+          path: dist/Kisaragi-Windows.exe
           if-no-files-found: error
           retention-days: 30

@@ -37,7 +37,7 @@ if sys.platform == "darwin":
         coll,
         name=f"{APP}.app",
         bundle_identifier="io.github.haoran-ou.kisaragi",
-        info_plist={"CFBundleDisplayName": APP, "CFBundleShortVersionString": "0.1.0",
+        info_plist={"CFBundleDisplayName": APP, "CFBundleShortVersionString": "0.1.1",
                     "NSHighResolutionCapable": True},
     )
 else:

@@ -1,6 +1,6 @@
 """HTTP 接口。
 
-运行：uv run acg-serve（默认读 data/acg.db，可用环境变量 ACG_DB 指定；模型配置见 .env.example）
+运行：uv run acg-serve（默认读 data/acg.db，可用环境变量 ACG_DB 指定；模型服务商和 Key 在网页的设置页里填）
 网页：启动后打开 http://127.0.0.1:8000/ ；接口文档：http://127.0.0.1:8000/docs
 """
 
@@ -133,12 +133,12 @@ class ChatResponse(BaseModel):
 class ProviderView(BaseModel):
     id: str
     name: str
-    models: list[str]  # 候选型号（也可以手填别的）
+    models: list[str]  # 候选型号（也可以手填别的）；第一个是默认的
+    model: str  # 这一家现在用的型号：设置页选过的，否则默认的（切回这一家时显示它）
     note: str  # 费用、能不能国内直连
     key_url: str  # 去哪申请 Key
-    has_key: bool
+    has_key: bool  # 设置页里有没有这一家的 Key（只看设置页，不读环境变量和 .env）
     key_hint: str | None  # 例：“…a1b2”；完整的 Key 永远不离开服务器
-    key_source: Literal["settings", "env"] | None  # 设置页填的，还是 .env 里的
 
 
 class SettingsView(BaseModel):
@@ -150,7 +150,7 @@ class SettingsView(BaseModel):
     providers: list[ProviderView]
     has_key: bool  # 当前服务商有没有 Key
     key_hint: str | None
-    key_source: Literal["settings", "env"] | None
+    using_ai: bool  # 现在会不会调用模型：选了服务商、有 Key（网页据此显示“正在使用：…”）
     appearance: Appearance
     agent_enabled: bool
     agent_always: bool
@@ -277,11 +277,11 @@ def create_app(
     galgame_db_path: Path | None = None,
     user_settings_path: Path | None = None,  # 不传时：没指定 settings 就用 data/settings.json；测试指定了 settings 就只放内存
 ) -> FastAPI:
-    app = FastAPI(title="ACG Agent", version="0.1.0")
+    app = FastAPI(title="ACG Agent", version="0.1.1")
     app.state.db_path = db_path or Path(os.environ.get("ACG_DB", DEFAULT_DB))
     app.state.galgame_db_path = galgame_db_path or Path(os.environ.get("ACG_GALGAME_DB", DEFAULT_GALGAME_DB))
     app.state.tag_index = None  # galgame 的标签索引，第一次用到时加载
-    app.state.base_settings = settings or load_settings()  # .env 和环境变量
+    app.state.base_settings = settings or load_settings()  # 不带任何 Key：Key 只来自设置页
     # 设置文件：环境变量 ACG_SETTINGS 可以指定（桌面客户端把它放进系统的用户数据文件夹）
     app.state.user_settings_path = user_settings_path or (
         Path(os.environ.get("ACG_SETTINGS", DEFAULT_USER_SETTINGS)) if settings is None else None)
@@ -338,26 +338,28 @@ def create_app(
         app.state.chat_agent = None
         app.state.galgame_agent = None
 
-    def key_of(pid: str) -> tuple[str | None, Literal["settings", "env"] | None]:
-        user, base = app.state.user, app.state.base_settings
-        if user.api_keys.get(pid):
-            return user.api_keys[pid], "settings"
-        if base.env_keys.get(pid) or (pid == base.provider and base.api_key):
-            return base.env_keys.get(pid) or base.api_key, "env"
-        return None, None
+    def key_of(pid: str) -> str | None:
+        if pid == "none":
+            return None
+        if app.state.user.api_keys.get(pid):
+            return app.state.user.api_keys[pid]
+        base = app.state.base_settings  # 只有测试、评估在代码里直接传入的 Settings 才会带 Key
+        return base.api_key if pid == base.provider else None
 
     def provider_view(pid: str) -> ProviderView:
         info = PROVIDERS[pid]
-        key, source = key_of(pid)
-        return ProviderView(id=pid, name=info.name, models=list(info.models), note=info.note, key_url=info.key_url,
-                            has_key=bool(key), key_hint=f"…{key[-4:]}" if key else None, key_source=source)
+        key = key_of(pid)
+        saved = app.state.settings.model if pid == app.state.settings.provider else app.state.user.models.get(pid)
+        return ProviderView(id=pid, name=info.name, models=list(info.models), model=saved or (info.models or ("",))[0],
+                            note=info.note, key_url=info.key_url,
+                            has_key=bool(key), key_hint=f"…{key[-4:]}" if key else None)
 
     def settings_view() -> SettingsView:
         user, s = app.state.user, app.state.settings
         current = provider_view(s.provider)
         return SettingsView(provider=s.provider, model=s.model, base_url=s.base_url,
                             providers=[provider_view(pid) for pid in PROVIDERS],
-                            has_key=current.has_key, key_hint=current.key_hint, key_source=current.key_source,
+                            has_key=current.has_key, key_hint=current.key_hint, using_ai=s.has_llm,
                             appearance=user.appearance,
                             agent_enabled=user.agent_enabled, agent_always=user.agent_always,
                             adult_enabled=user.adult_enabled,
@@ -452,6 +454,8 @@ def create_app(
                 raise HTTPException(status_code=422, detail=f"不认识的服务商：{req.provider}")
             user.provider = req.provider
         target = req.provider or app.state.settings.provider
+        if req.api_key is not None and req.api_key.strip() and target == "none":
+            raise HTTPException(status_code=422, detail="“不用 AI”不需要 Key：先选一家服务商再填")
         if req.api_key is not None:
             key = req.api_key.strip()
             if key and (len(key) < 16 or any(ch.isspace() for ch in key)):
@@ -460,7 +464,7 @@ def create_app(
                 user.api_keys[target] = key
             else:
                 user.api_keys.pop(target, None)
-        if req.model is not None:
+        if req.model is not None and target != "none":
             user.models[target] = req.model
         if req.base_url is not None:
             url = req.base_url.strip()
@@ -543,6 +547,8 @@ def create_app(
     async def test_connection() -> dict:
         """用一句很短的话试一下当前的服务商、Key、型号能不能用（解析一句话，约 1 次调用）。"""
         s = app.state.settings
+        if s.provider == "none":
+            return {"ok": False, "detail": "现在选的是“不用 AI（只用规则）”，不需要测试"}
         if app.state.agent is None:
             return {"ok": False, "detail": f"还没有填 {provider_info(s.provider).name} 的 Key"}
         outcome = await parse_text("2010年以后的治愈番", ["治愈", "日常"], s, app.state.agent)

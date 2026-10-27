@@ -20,8 +20,8 @@ Download from [Releases](https://github.com/haoran-ou/acgn-agent-p/releases/late
 
 | System | Download | How to open |
 |---|---|---|
-| Windows 10 / 11 | `如月寮.exe` | Double-click it, no installation needed (**not yet tested on Windows**) |
-| macOS (Apple silicon, M1 and later) | `如月寮-macOS.zip` | Double-click to unzip it, then drag "如月寮" into Applications |
+| Windows 10 / 11 | `Kisaragi-Windows.exe` | Double-click it, no installation needed (**not yet tested on Windows**) |
+| macOS (Apple silicon, M1 and later) | `Kisaragi-macOS.zip` | Double-click to unzip it, then drag "如月寮" into Applications |
 
 You need about 3 GB of disk space, and about 650 MB of data is downloaded on first use.
 
@@ -34,7 +34,7 @@ You need about 3 GB of disk space, and about 650 MB of data is downloaded on fir
 
 **2. Prepare the data**: click **开始准备数据** (Prepare data) in the window. The app downloads data from the official Bangumi, bangumi-data and VNDB sources, verifies it and imports it, which takes a few minutes. If the connection drops, click it again and it resumes where it stopped.
 
-**3. Add an AI key (optional, recommended)**: see the next section. Without one the app still works, but sentences are understood by rules only and the agent is unavailable.
+**3. Add an AI key (optional, recommended)**: see the next section. The app ships with no AI key, so right after installing it uses **不用 AI（只用规则）** (No AI, rules only): free and fastest, but it can't understand complex requests and the agent is unavailable. The top of the page shows what is currently in use.
 
 ## Adding an AI key (optional)
 
@@ -55,7 +55,7 @@ You need about 3 GB of disk space, and about 650 MB of data is downloaded on fir
 | Google Gemini | No | Free quota |
 | Custom | — | Any OpenAI-compatible API, e.g. a local Ollama |
 
-Keys are stored only on your computer, and the page shows only the last 4 characters. Free models have rate limits: if you ask too quickly, the agent temporarily falls back to a normal search. Wait a moment and ask again.
+Keys are stored only on your computer, and the page shows only the last 4 characters. The app never reads keys from elsewhere on your computer (environment variables, `.env` files). To go back to no AI, choose **不用 AI（只用规则）** (No AI) as the provider in Settings; your keys are kept. Free models have rate limits: if you ask too quickly, the agent temporarily falls back to a normal search. Wait a moment and ask again.
 
 ## Everyday use
 

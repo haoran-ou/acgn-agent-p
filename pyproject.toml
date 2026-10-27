@@ -1,6 +1,6 @@
 [project]
 name = "acg-agent"
-version = "0.1.0"
+version = "0.1.1"
 description = "面向复杂偏好的 ACG 发现系统，提供可追溯的匹配依据"
 readme = "README.md"
 license = "MIT"

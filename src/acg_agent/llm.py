@@ -16,7 +16,7 @@ from acg_agent.config import Settings
 class ProviderInfo:
     id: str
     name: str
-    env_key: str  # .env 里放 Key 的变量名
+    env_key: str  # 开发配置文件里放 Key 的变量名（只有评估工具用；网页和桌面版只用设置页的 Key）
     base_url: str | None  # OpenAI 兼容接口的地址；Gemini 为 None
     models: tuple[str, ...]  # 设置页里的候选（也可以手填别的型号）
     note: str  # 给用户看的一句话：费用、能不能国内直连
@@ -26,6 +26,8 @@ class ProviderInfo:
 
 
 PROVIDERS: dict[str, ProviderInfo] = {p.id: p for p in [
+    ProviderInfo("none", "不用 AI（只用规则）", "", None, (),
+                 "免费、最快，不联网调用模型；理解不了复杂的说法，代理人不可用", ""),
     ProviderInfo("zhipu", "智谱 GLM", "ZHIPU_API_KEY", "https://open.bigmodel.cn/api/paas/v4/",
                  ("glm-4.7-flash", "glm-4-flash-250414"), "国内直连；GLM-4.7-Flash 免费（有并发限制）",
                  "https://open.bigmodel.cn/usercenter/proj-mgmt/apikeys",
@@ -46,7 +48,8 @@ PROVIDERS: dict[str, ProviderInfo] = {p.id: p for p in [
     ProviderInfo("custom", "自定义（OpenAI 兼容接口）", "CUSTOM_API_KEY", None, (),
                  "填任意 OpenAI 兼容接口的地址，例如本机的 Ollama", ""),
 ]}
-DEFAULT_PROVIDER = "zhipu"  # 你的决定：免费、国内直连，新用户最容易上手
+DEFAULT_PROVIDER = "none"  # 新用户默认不用 AI，自己选了服务商、填了 Key 才调用（你的决定，2026-10-26）
+RECOMMENDED_PROVIDER = "zhipu"  # 推荐新用户申请的：免费、国内直连
 
 
 def provider_info(provider_id: str) -> ProviderInfo:
@@ -55,6 +58,8 @@ def provider_info(provider_id: str) -> ProviderInfo:
 
 def make_model(settings: Settings, timeout_s: float | None = None):
     """按设置创建 Pydantic AI 的模型对象。没有 Key 时抛 ValueError（调用方据此退回规则解析）。"""
+    if settings.provider == "none":
+        raise ValueError("现在选的是不用 AI（只用规则）")
     if not settings.api_key:
         raise ValueError(f"没有配置 {provider_info(settings.provider).name} 的 API Key")
     if settings.provider == "gemini":

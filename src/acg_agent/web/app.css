@@ -341,7 +341,30 @@ dialog {
   box-shadow: inset 0 2px 0 var(--accent);
 }
 dialog::backdrop { background: rgba(0, 4, 12, 0.6); backdrop-filter: blur(3px); }
-dialog h2 { margin: 0 0 0.5rem; font-size: 1rem; letter-spacing: 0.3em; color: var(--accent); }
+dialog h2 { margin: 0; font-size: 1rem; letter-spacing: 0.3em; color: var(--accent); }
+/* 标题行贴在对话框顶部：往下滚动时右上角的 × 也一直看得到 */
+.dialog-head {
+  position: sticky; top: -1.1rem; z-index: 2;
+  display: flex; justify-content: space-between; align-items: center;
+  margin: -1.1rem -1.25rem 0; padding: 0.8rem 1.25rem 0.5rem;
+  background: rgba(var(--panel-rgb), 0.98);
+}
+.icon-button {
+  width: 2rem; height: 2rem; padding: 0; font-size: 1.3rem; line-height: 1;
+  background: transparent; color: var(--muted); box-shadow: none; border: 1px solid var(--line);
+}
+.icon-button:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); box-shadow: var(--glow); }
+.model-status { margin: 0.25rem 0 0; font-size: 0.85rem; color: var(--text); }
+.model-status b { color: var(--accent); font-weight: 600; }
+/* 有更改没保存时，在对话框底部弹出的确认条 */
+.unsaved {
+  position: sticky; bottom: -1.1rem; z-index: 2;
+  margin: 1rem -1.25rem -1.1rem; padding: 0.75rem 1.25rem 0.9rem;
+  background: rgba(var(--panel-rgb), 0.99);
+  box-shadow: inset 0 2px 0 var(--conflict);
+}
+.unsaved p { margin: 0; font-size: 0.9rem; color: var(--conflict); font-weight: 600; }
+.unsaved .dialog-buttons { margin-top: 0.6rem; flex-wrap: wrap; }
 fieldset { border: 1px solid var(--line); margin: 0.75rem 0 0; padding: 0.5rem 0.75rem 0.75rem; }
 legend { font: 0.75rem var(--mono); letter-spacing: 0.15em; color: var(--accent); padding: 0 0.3rem; }
 .field { display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.5rem; font-size: 0.88rem; }

@@ -19,6 +19,7 @@
       </nav>
       <p class="subtitle" id="subtitle">用一句话描述你想看的动画，每部结果都附上判断依据。</p>
       <p class="note small" id="data-age"></p>
+      <p class="note small" id="model-status"></p>
     </header>
 
     <!-- 第一次使用（C-01）：还没有数据时只显示这一块 -->
@@ -29,7 +30,7 @@
       <div class="progress" id="setup-bar-box" hidden><div id="setup-bar"></div></div>
       <p id="setup-progress" class="note" hidden></p>
     </section>
-    <p id="setup-done" class="panel note" hidden>数据准备好了。可以直接搜索；想用 AI 理解一句话和代理人，在右上角“设置”里选服务商、填 Key（推荐智谱 GLM：免费、国内直连）。</p>
+    <p id="setup-done" class="panel note" hidden>数据准备好了，可以直接搜索。现在只用规则理解一句话（免费、最快）；想用 AI 理解复杂的说法、用代理人，在右上角“设置”里选服务商、填你自己的 Key（推荐智谱 GLM：免费、国内直连）。</p>
 
     <form id="ask-form" class="ask" autocomplete="off">
       <div class="ask-row">
@@ -101,7 +102,11 @@
 
   <dialog id="settings-dialog" aria-labelledby="settings-title">
     <form id="settings-form" method="dialog">
-      <h2 id="settings-title">设置</h2>
+      <div class="dialog-head">
+        <h2 id="settings-title">设置</h2>
+        <button type="button" id="settings-close" class="icon-button" aria-label="关闭设置" title="关闭">×</button>
+      </div>
+      <p id="settings-model-status" class="model-status"></p>
 
       <fieldset>
         <legend>模型与 API</legend>
@@ -114,9 +119,12 @@
           <ul id="free-key-list" class="note small"></ul>
           <p class="note small">免费额度和型号会变，以各家官网为准。申请后回到这里：选那一家、粘贴 Key、点“保存并测试连接”。</p>
         </details>
-        <label class="field">型号（可以选，也可以手填）
-          <input id="set-model" list="model-options" autocomplete="off" spellcheck="false">
-          <datalist id="model-options"></datalist>
+        <div id="provider-fields">
+        <label class="field">型号
+          <select id="set-model"></select>
+        </label>
+        <label class="field" id="model-custom-row" hidden>自己填写的型号
+          <input id="set-model-custom" autocomplete="off" spellcheck="false" placeholder="例如 deepseek-reasoner">
         </label>
         <label class="field" id="base-url-row" hidden>接口地址（OpenAI 兼容）
           <input id="set-base-url" type="url" autocomplete="off" spellcheck="false" placeholder="https://… 或 http://127.0.0.1:11434/v1">
@@ -125,10 +133,11 @@
           <input id="set-key" type="password" autocomplete="off" spellcheck="false" placeholder="留空表示不修改">
         </label>
         <p id="key-status" class="note small"></p>
-        <label class="check"><input type="checkbox" id="set-clear-key"> 清除设置页保存的这一家的 Key（之后改用 .env 里的）</label>
+        <label class="check"><input type="checkbox" id="set-clear-key"> 删除这一家的 Key</label>
         <button type="button" id="test-connection" class="ghost small-button">保存并测试连接</button>
         <p id="test-result" class="note small" hidden></p>
-        <p class="note small">Key 只保存在本机（data/settings.json，只有你自己能读），网页上只显示末 4 位；每家的 Key 分开保存，切换服务商不会丢。</p>
+        </div>
+        <p class="note small">Key 只保存在本机的设置文件里（只有你自己能读），网页上只显示末 4 位；每家的 Key 分开保存，切换服务商不会丢。程序不会读取你电脑上别处的 Key（环境变量、.env 文件）。</p>
       </fieldset>
 
       <fieldset>
@@ -177,10 +186,18 @@
         <p id="data-status" class="note small"></p>
         <button type="button" id="update-now" class="ghost small-button">立即更新</button>
         <p id="update-progress" class="note small" hidden></p>
-        <p class="note small">从 Bangumi、bangumi-data、VNDB 的官方来源下载最新数据包并导入；在后台进行，期间网站照常可用。也可以在终端运行 uv run acg-update。</p>
+        <p class="note small">从 Bangumi、bangumi-data、VNDB 的官方来源下载最新数据包并导入；在后台进行，期间网站照常可用。</p>
       </fieldset>
 
       <p id="settings-error" class="settings-error" hidden></p>
+      <div id="unsaved-box" class="unsaved" hidden role="alertdialog" aria-labelledby="unsaved-text">
+        <p id="unsaved-text">有更改还没有保存。</p>
+        <div class="dialog-buttons">
+          <button type="button" id="unsaved-back" class="ghost">返回修改</button>
+          <button type="button" id="unsaved-discard" class="ghost">不保存，关闭</button>
+          <button type="button" id="unsaved-save">保存并关闭</button>
+        </div>
+      </div>
       <div class="dialog-buttons">
         <button type="button" id="settings-cancel" class="ghost">取消</button>
         <button type="submit" id="settings-save">保存</button>
