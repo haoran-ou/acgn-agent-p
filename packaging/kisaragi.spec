@@ -26,6 +26,8 @@ a = Analysis(
     excludes=["tkinter", "pytest", "PyInstaller"],
     noarchive=False,
 )
+# 本项目的包信息里有 direct_url.json，记着打包那台电脑上的源代码路径（含用户名），不带进程序
+a.datas = [d for d in a.datas if not d[0].endswith("direct_url.json")]
 pyz = PYZ(a.pure)
 
 if sys.platform == "darwin":
